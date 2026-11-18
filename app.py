@@ -26,8 +26,8 @@ st.set_page_config(
 # 2. API CONFIGURATION
 # ==========================================
 
-ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "sk_dd6ff6b5ab04e4ede3ea860612b2e125807a0feb1e59b7fe")
-MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "uxw-3YMyT_gi5Ni")
+ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
+MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
 
 # Working female Buyer voice and male Seller voice
 BUYER_VOICE_ID = "hpp4J3VqNfWAUOO0d1Us"
