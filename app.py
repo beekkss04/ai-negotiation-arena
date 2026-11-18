@@ -2,8 +2,11 @@
 import json
 import html
 import math
+import hashlib
 import requests
 import streamlit as st
+
+from audio_recorder_streamlit import audio_recorder
 
 
 # ==========================================
@@ -18,17 +21,27 @@ st.set_page_config(
 
 
 # ==========================================
-# 2. CUSTOM CSS
+# 2. API CONFIGURATION
+# ==========================================
+
+ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
+MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
+
+# Different voices for Buyer and Seller
+BUYER_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+SELLER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
+
+
+# ==========================================
+# 3. CUSTOM CSS
 # ==========================================
 
 st.markdown("""
 <style>
-
 .stApp {
     background: linear-gradient(135deg, #0b1020, #17152f);
     color: white;
 }
-
 .agent {
     background: #182441;
     border: 1px solid #477bc2;
@@ -36,11 +49,9 @@ st.markdown("""
     padding: 20px;
     text-align: center;
 }
-
 .seller {
     border-color: #a56bd5;
 }
-
 .chat {
     background: #19243c;
     border-radius: 12px;
@@ -48,7 +59,6 @@ st.markdown("""
     margin: 10px 0;
     border: 1px solid #293955;
 }
-
 .result {
     background: #104333;
     border: 1px solid #20c987;
@@ -57,7 +67,6 @@ st.markdown("""
     text-align: center;
     color: white;
 }
-
 .no-deal {
     background: #382c17;
     border: 1px solid #d6a62e;
@@ -66,28 +75,28 @@ st.markdown("""
     color: #ffd34e;
     text-align: center;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 
 # ==========================================
-# 3. HEADER
+# 4. HEADER AND SESSION STATE
 # ==========================================
 
 st.title("🤝 AI Negotiation Arena")
 
 st.caption(
-    "Two autonomous AI agents • Real-time price negotiation"
+    "Two autonomous AI agents • Voice-enabled negotiation"
 )
-
-
-# ==========================================
-# 4. SESSION STATE
-# ==========================================
 
 if "result" not in st.session_state:
     st.session_state.result = None
+
+if "product_input" not in st.session_state:
+    st.session_state.product_input = "Gaming Laptop"
+
+if "last_audio_hash" not in st.session_state:
+    st.session_state.last_audio_hash = None
 
 
 # ==========================================
@@ -95,12 +104,10 @@ if "result" not in st.session_state:
 # ==========================================
 
 def parse_agent(value):
-
     if isinstance(value, dict):
         return value
 
     if isinstance(value, str):
-
         try:
             parsed = json.loads(value)
 
@@ -120,16 +127,13 @@ def parse_agent(value):
 
 
 def rupees(value):
-
     try:
         return f"₹{float(value):,.0f}"
-
     except (TypeError, ValueError):
         return "—"
 
 
 def normalize_price(value):
-
     if isinstance(value, bool):
         return None
 
@@ -146,7 +150,68 @@ def normalize_price(value):
 
 
 # ==========================================
-# 6. NEGOTIATION SETUP
+# 6. ELEVENLABS SPEECH-TO-TEXT
+# ==========================================
+
+def transcribe_audio(audio_bytes):
+
+    if not ELEVENLABS_API_KEY:
+        raise ValueError("ElevenLabs API key is missing.")
+
+    response = requests.post(
+        "https://api.elevenlabs.io/v1/speech-to-text",
+        headers={
+            "xi-api-key": ELEVENLABS_API_KEY
+        },
+        files={
+            "file": ("recording.wav", audio_bytes, "audio/wav")
+        },
+        data={
+            "model_id": "scribe_v2"
+        },
+        timeout=90
+    )
+
+    response.raise_for_status()
+
+    result = response.json()
+
+    return result.get("text", "").strip()
+
+
+# ==========================================
+# 7. ELEVENLABS TEXT-TO-SPEECH
+# ==========================================
+
+@st.cache_data(show_spinner=False)
+def generate_voice(text, voice_id):
+
+    if not ELEVENLABS_API_KEY:
+        raise ValueError("ElevenLabs API key is missing.")
+
+    response = requests.post(
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+        params={
+            "output_format": "mp3_44100_128"
+        },
+        headers={
+            "xi-api-key": ELEVENLABS_API_KEY,
+            "Content-Type": "application/json"
+        },
+        json={
+            "text": text,
+            "model_id": "eleven_multilingual_v2"
+        },
+        timeout=90
+    )
+
+    response.raise_for_status()
+
+    return response.content
+
+
+# ==========================================
+# 8. NEGOTIATION SETUP
 # ==========================================
 
 with st.sidebar:
@@ -159,11 +224,55 @@ with st.sidebar:
         help="Paste your private Make custom webhook URL."
     )
 
+    st.divider()
+
+    st.subheader("🎙️ Voice Input")
+
+    st.write("Record your product name using your microphone.")
+
+    audio_bytes = audio_recorder(
+        text="Click to record",
+        recording_color="#e74c3c",
+        neutral_color="#477bc2",
+        icon_name="microphone",
+        icon_size="2x"
+    )
+
+    if audio_bytes:
+
+        audio_hash = hashlib.sha256(audio_bytes).hexdigest()
+
+        if audio_hash != st.session_state.last_audio_hash:
+
+            st.session_state.last_audio_hash = audio_hash
+
+            try:
+                with st.spinner("Transcribing your speech..."):
+
+                    transcript = transcribe_audio(audio_bytes)
+
+                if transcript:
+                    st.session_state.product_input = transcript
+                    st.success(f"Recognized: {transcript}")
+                    st.rerun()
+                else:
+                    st.warning("No speech detected. Please record again.")
+
+            except Exception as error:
+                st.error(f"Transcription failed: {error}")
+
+    st.divider()
+
+    voice_enabled = st.checkbox(
+        "🔊 Enable AI voice responses",
+        value=True
+    )
+
     with st.form("setup"):
 
         product = st.text_input(
             "Product",
-            "Gaming Laptop"
+            key="product_input"
         )
 
         st.subheader("🔵 Buyer AI")
@@ -205,7 +314,7 @@ with st.sidebar:
 
 
 # ==========================================
-# 7. START NEGOTIATION
+# 9. START NEGOTIATION
 # ==========================================
 
 if start:
@@ -219,6 +328,10 @@ if start:
     elif not webhook.startswith("https://"):
 
         st.error("Enter your valid Make webhook URL.")
+
+    elif not MAKE_API_KEY:
+
+        st.error("Make API key is missing from Streamlit Secrets.")
 
     elif buyer_open > buyer_max:
 
@@ -252,6 +365,9 @@ if start:
                 response = requests.post(
                     webhook,
                     json=payload,
+                    headers={
+                        "x-make-apikey": MAKE_API_KEY
+                    },
                     timeout=120
                 )
 
@@ -287,13 +403,12 @@ if start:
 
 
 # ==========================================
-# 8. AGENT LAYOUT
+# 10. AGENT LAYOUT
 # ==========================================
 
 buyer_col, conversation_col, seller_col = st.columns(
     [1, 2, 1]
 )
-
 
 with buyer_col:
 
@@ -328,7 +443,7 @@ with seller_col:
 
 
 # ==========================================
-# 9. NEGOTIATION TRANSCRIPT
+# 11. NEGOTIATION TRANSCRIPT
 # ==========================================
 
 with conversation_col:
@@ -350,15 +465,15 @@ with conversation_col:
         )
 
         labels = [
-            ("Round 1 · Buyer AI", "buyer_round_1", "🔵"),
-            ("Round 1 · Seller AI", "seller_round_1", "🟣"),
-            ("Round 2 · Buyer AI", "buyer_round_2", "🔵"),
-            ("Round 2 · Seller AI", "seller_round_2", "🟣")
+            ("Round 1 · Buyer AI", "buyer_round_1", "🔵", BUYER_VOICE_ID),
+            ("Round 1 · Seller AI", "seller_round_1", "🟣", SELLER_VOICE_ID),
+            ("Round 2 · Buyer AI", "buyer_round_2", "🔵", BUYER_VOICE_ID),
+            ("Round 2 · Seller AI", "seller_round_2", "🟣", SELLER_VOICE_ID)
         ]
 
         parsed = {}
 
-        for label, key, emoji in labels:
+        for label, key, emoji, voice_id in labels:
 
             agent = parse_agent(data.get(key))
 
@@ -366,19 +481,14 @@ with conversation_col:
 
             if agent:
 
-                spoken = html.escape(
-                    str(
-                        agent.get(
-                            "spoken_response",
-                            "No response"
-                        )
-                    )
+                spoken_text = str(
+                    agent.get("spoken_response", "No response")
                 )
 
+                spoken = html.escape(spoken_text)
+
                 decision = html.escape(
-                    str(
-                        agent.get("decision", "—")
-                    ).upper()
+                    str(agent.get("decision", "—")).upper()
                 )
 
                 price = rupees(
@@ -400,6 +510,28 @@ with conversation_col:
                     unsafe_allow_html=True
                 )
 
+                if voice_enabled and spoken_text.strip():
+
+                    try:
+
+                        with st.spinner(f"Generating {label} voice..."):
+
+                            audio = generate_voice(
+                                spoken_text,
+                                voice_id
+                            )
+
+                        st.audio(
+                            audio,
+                            format="audio/mp3"
+                        )
+
+                    except Exception as error:
+
+                        st.warning(
+                            f"Voice generation unavailable for {label}: {error}"
+                        )
+
             else:
 
                 st.warning(
@@ -408,11 +540,8 @@ with conversation_col:
 
 
         # ==========================================
-        # 10. FINAL DEAL VALIDATION
+        # 12. FINAL DEAL VALIDATION
         # ==========================================
-
-        # Maintain the actual chronological order
-        # of the negotiation.
 
         negotiation_sequence = [
 
@@ -429,13 +558,6 @@ with conversation_col:
         deal = False
 
         agreed_price = None
-
-        # Compare each response with the immediately
-        # preceding offer.
-        #
-        # Buyer R1 -> Seller R1
-        # Seller R1 -> Buyer R2
-        # Buyer R2 -> Seller R2
 
         for previous, current in zip(
             negotiation_sequence,
@@ -460,17 +582,11 @@ with conversation_col:
             if current_price is None:
                 continue
 
-            # The current agent must explicitly accept.
-
             if current_decision != "accept":
                 continue
 
-            # Accepted price must match the previous offer.
-
             if previous_price != current_price:
                 continue
-
-            # Both parties' limits must be respected.
 
             if not (
                 seller_min <= current_price <= buyer_max
@@ -485,7 +601,7 @@ with conversation_col:
 
 
         # ==========================================
-        # 11. FINAL RESULT DISPLAY
+        # 13. FINAL RESULT DISPLAY
         # ==========================================
 
         if deal:
@@ -527,7 +643,7 @@ with conversation_col:
 
 
         # ==========================================
-        # 12. RAW AI RESPONSE
+        # 14. RAW AI RESPONSE
         # ==========================================
 
         with st.expander("View raw AI response"):
