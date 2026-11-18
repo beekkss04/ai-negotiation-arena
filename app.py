@@ -128,10 +128,23 @@ def rupees(value):
 
 def valid_number(value):
 
-    return (
-        isinstance(value, (int, float))
-        and not isinstance(value, bool)
-    )
+    if isinstance(value, bool):
+        return False
+
+    try:
+        float(value)
+        return True
+
+    except (TypeError, ValueError):
+        return False
+
+
+def normalize_price(value):
+
+    if not valid_number(value):
+        return None
+
+    return float(value)
 
 
 # ==========================================
@@ -249,6 +262,7 @@ if start:
                 result_data = response.json()
 
                 if not isinstance(result_data, dict):
+
                     raise ValueError(
                         "Webhook returned an invalid JSON structure."
                     )
@@ -285,32 +299,26 @@ buyer_col, conversation_col, seller_col = st.columns(
 
 with buyer_col:
 
-    st.markdown("""
-    <div class="agent">
-
-        <div style="font-size:65px">👩🏻‍💼</div>
-
-        <h3>Buyer AI</h3>
-
-        <p>🔵 Strategic · Firm</p>
-
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="agent">'
+        '<div style="font-size:65px">👩🏻‍💼</div>'
+        '<h3>Buyer AI</h3>'
+        '<p>🔵 Strategic · Firm</p>'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
 
 with seller_col:
 
-    st.markdown("""
-    <div class="agent seller">
-
-        <div style="font-size:65px">🧑🏻‍💼</div>
-
-        <h3>Seller AI</h3>
-
-        <p>🟣 Confident · Persuasive</p>
-
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(
+        '<div class="agent seller">'
+        '<div style="font-size:65px">🧑🏻‍💼</div>'
+        '<h3>Seller AI</h3>'
+        '<p>🟣 Confident · Persuasive</p>'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
 
 # ==========================================
@@ -331,11 +339,9 @@ with conversation_col:
 
     else:
 
-        safe_product = html.escape(
-            str(data.get("product", product))
-        )
+        display_product = data.get("product", product)
 
-        st.write(f"**Product:** {safe_product}")
+        st.write(f"**Product:** {display_product}")
 
         labels = [
 
@@ -381,18 +387,11 @@ with conversation_col:
                 st.markdown(
                     f"""
                     <div class="chat">
-
                         <b>{emoji} {label}</b>
-
                         <br>
-
                         {spoken}
-
                         <br>
-
-                        <b>{price}</b>
-                        · {decision}
-
+                        <b>{price}</b> · {decision}
                     </div>
                     """,
                     unsafe_allow_html=True
@@ -409,17 +408,15 @@ with conversation_col:
         # 10. FINAL DEAL VALIDATION
         # ==========================================
 
-        buyer_rounds = [
+        # Responses must be checked in chronological order.
+
+        negotiation_sequence = [
 
             parsed.get("buyer_round_1", {}),
 
-            parsed.get("buyer_round_2", {})
-
-        ]
-
-        seller_rounds = [
-
             parsed.get("seller_round_1", {}),
+
+            parsed.get("buyer_round_2", {}),
 
             parsed.get("seller_round_2", {})
 
@@ -429,63 +426,57 @@ with conversation_col:
 
         agreed_price = None
 
-        # Compare offers and acceptances from all rounds.
-        # One agent accepting the other agent's matching
-        # offer is sufficient for a valid agreement.
+        # A deal occurs when an agent explicitly accepts
+        # the immediately preceding agent's offer.
+        #
+        # Buyer R1 -> Seller R1
+        # Seller R1 -> Buyer R2
+        # Buyer R2 -> Seller R2
 
-        for buyer in buyer_rounds:
+        for previous, current in zip(
+            negotiation_sequence,
+            negotiation_sequence[1:]
+        ):
 
-            for seller in seller_rounds:
+            previous_price = normalize_price(
+                previous.get("proposed_price")
+            )
 
-                buyer_price = buyer.get(
-                    "proposed_price"
-                )
+            current_price = normalize_price(
+                current.get("proposed_price")
+            )
 
-                seller_price = seller.get(
-                    "proposed_price"
-                )
+            current_decision = str(
+                current.get("decision", "")
+            ).strip().lower()
 
-                buyer_decision = str(
-                    buyer.get("decision", "")
-                ).strip().lower()
+            if previous_price is None:
+                continue
 
-                seller_decision = str(
-                    seller.get("decision", "")
-                ).strip().lower()
+            if current_price is None:
+                continue
 
-                if not valid_number(buyer_price):
-                    continue
+            if current_decision != "accept":
+                continue
 
-                if not valid_number(seller_price):
-                    continue
+            # The accepted price must match
+            # the immediately preceding offer.
 
-                # Both prices must match.
+            if previous_price != current_price:
+                continue
 
-                if buyer_price != seller_price:
-                    continue
+            # Check both parties' price limits.
 
-                # Price must satisfy both parties' limits.
+            if not (
+                seller_min <= current_price <= buyer_max
+            ):
+                continue
 
-                if not (
-                    seller_min <= buyer_price <= buyer_max
-                ):
-                    continue
+            deal = True
 
-                # At least one agent must explicitly accept.
+            agreed_price = current_price
 
-                if (
-                    buyer_decision == "accept"
-                    or seller_decision == "accept"
-                ):
-
-                    deal = True
-
-                    agreed_price = buyer_price
-
-                    break
-
-            if deal:
-                break
+            break
 
 
         # ==========================================
