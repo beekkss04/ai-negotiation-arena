@@ -3,8 +3,10 @@ import json
 import html
 import math
 import hashlib
+import base64
 import requests
 import streamlit as st
+import streamlit.components.v1 as components
 
 from audio_recorder_streamlit import audio_recorder
 
@@ -27,7 +29,7 @@ st.set_page_config(
 ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
 MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
 
-# Different voices for Buyer and Seller
+# Working female Buyer voice and male Seller voice
 BUYER_VOICE_ID = "hpp4J3VqNfWAUOO0d1Us"
 SELLER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 
@@ -98,16 +100,21 @@ if "product_input" not in st.session_state:
 if "last_audio_hash" not in st.session_state:
     st.session_state.last_audio_hash = None
 
+if "playback_id" not in st.session_state:
+    st.session_state.playback_id = 0
+
 
 # ==========================================
 # 5. HELPER FUNCTIONS
 # ==========================================
 
 def parse_agent(value):
+
     if isinstance(value, dict):
         return value
 
     if isinstance(value, str):
+
         try:
             parsed = json.loads(value)
 
@@ -127,13 +134,16 @@ def parse_agent(value):
 
 
 def rupees(value):
+
     try:
         return f"₹{float(value):,.0f}"
+
     except (TypeError, ValueError):
         return "—"
 
 
 def normalize_price(value):
+
     if isinstance(value, bool):
         return None
 
@@ -164,7 +174,11 @@ def transcribe_audio(audio_bytes):
             "xi-api-key": ELEVENLABS_API_KEY
         },
         files={
-            "file": ("recording.wav", audio_bytes, "audio/wav")
+            "file": (
+                "recording.wav",
+                audio_bytes,
+                "audio/wav"
+            )
         },
         data={
             "model_id": "scribe_v2"
@@ -174,9 +188,7 @@ def transcribe_audio(audio_bytes):
 
     response.raise_for_status()
 
-    result = response.json()
-
-    return result.get("text", "").strip()
+    return response.json().get("text", "").strip()
 
 
 # ==========================================
@@ -228,7 +240,9 @@ with st.sidebar:
 
     st.subheader("🎙️ Voice Input")
 
-    st.write("Record your product name using your microphone.")
+    st.write(
+        "Record your product name using your microphone."
+    )
 
     audio_bytes = audio_recorder(
         text="Click to record",
@@ -240,26 +254,41 @@ with st.sidebar:
 
     if audio_bytes:
 
-        audio_hash = hashlib.sha256(audio_bytes).hexdigest()
+        audio_hash = hashlib.sha256(
+            audio_bytes
+        ).hexdigest()
 
         if audio_hash != st.session_state.last_audio_hash:
 
             st.session_state.last_audio_hash = audio_hash
 
             try:
+
                 with st.spinner("Transcribing your speech..."):
 
                     transcript = transcribe_audio(audio_bytes)
 
                 if transcript:
+
                     st.session_state.product_input = transcript
-                    st.success(f"Recognized: {transcript}")
+
+                    st.success(
+                        f"Recognized: {transcript}"
+                    )
+
                     st.rerun()
+
                 else:
-                    st.warning("No speech detected. Please record again.")
+
+                    st.warning(
+                        "No speech detected. Please record again."
+                    )
 
             except Exception as error:
-                st.error(f"Transcription failed: {error}")
+
+                st.error(
+                    f"Transcription failed: {error}"
+                )
 
     st.divider()
 
@@ -331,7 +360,9 @@ if start:
 
     elif not MAKE_API_KEY:
 
-        st.error("Make API key is missing from Streamlit Secrets.")
+        st.error(
+            "Make API key is missing from Streamlit Secrets."
+        )
 
     elif buyer_open > buyer_max:
 
@@ -382,6 +413,9 @@ if start:
                     )
 
                 st.session_state.result = result_data
+
+                # New playback sequence for this negotiation
+                st.session_state.playback_id += 1
 
         except requests.exceptions.Timeout:
 
@@ -465,13 +499,35 @@ with conversation_col:
         )
 
         labels = [
-            ("Round 1 · Buyer AI", "buyer_round_1", "🔵", BUYER_VOICE_ID),
-            ("Round 1 · Seller AI", "seller_round_1", "🟣", SELLER_VOICE_ID),
-            ("Round 2 · Buyer AI", "buyer_round_2", "🔵", BUYER_VOICE_ID),
-            ("Round 2 · Seller AI", "seller_round_2", "🟣", SELLER_VOICE_ID)
+            (
+                "Round 1 · Buyer AI",
+                "buyer_round_1",
+                "🔵",
+                BUYER_VOICE_ID
+            ),
+            (
+                "Round 1 · Seller AI",
+                "seller_round_1",
+                "🟣",
+                SELLER_VOICE_ID
+            ),
+            (
+                "Round 2 · Buyer AI",
+                "buyer_round_2",
+                "🔵",
+                BUYER_VOICE_ID
+            ),
+            (
+                "Round 2 · Seller AI",
+                "seller_round_2",
+                "🟣",
+                SELLER_VOICE_ID
+            )
         ]
 
         parsed = {}
+
+        voice_playlist = []
 
         for label, key, emoji, voice_id in labels:
 
@@ -482,13 +538,18 @@ with conversation_col:
             if agent:
 
                 spoken_text = str(
-                    agent.get("spoken_response", "No response")
+                    agent.get(
+                        "spoken_response",
+                        "No response"
+                    )
                 )
 
                 spoken = html.escape(spoken_text)
 
                 decision = html.escape(
-                    str(agent.get("decision", "—")).upper()
+                    str(
+                        agent.get("decision", "—")
+                    ).upper()
                 )
 
                 price = rupees(
@@ -510,26 +571,32 @@ with conversation_col:
                     unsafe_allow_html=True
                 )
 
+                # Generate and collect voice in chronological order
                 if voice_enabled and spoken_text.strip():
 
                     try:
 
-                        with st.spinner(f"Generating {label} voice..."):
+                        with st.spinner(
+                            f"Generating {label} voice..."
+                        ):
 
                             audio = generate_voice(
                                 spoken_text,
                                 voice_id
                             )
 
-                        st.audio(
-                            audio,
-                            format="audio/mp3"
-                        )
+                        voice_playlist.append({
+                            "label": label,
+                            "audio": base64.b64encode(
+                                audio
+                            ).decode("utf-8")
+                        })
 
                     except Exception as error:
 
                         st.warning(
-                            f"Voice generation unavailable for {label}: {error}"
+                            f"Voice generation unavailable for "
+                            f"{label}: {error}"
                         )
 
             else:
@@ -540,7 +607,146 @@ with conversation_col:
 
 
         # ==========================================
-        # 12. FINAL DEAL VALIDATION
+        # 12. AUTOMATIC SEQUENTIAL VOICE PLAYBACK
+        # ==========================================
+
+        if voice_enabled and voice_playlist:
+
+            st.markdown(
+                "### 🎧 Automatic AI Conversation"
+            )
+
+            playlist_json = json.dumps(
+                voice_playlist
+            )
+
+            playback_id = st.session_state.playback_id
+
+            player_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <body style="
+                background:#19243c;
+                color:white;
+                font-family:Arial,sans-serif;
+                padding:15px;
+                border-radius:12px;
+            ">
+
+            <div style="
+                font-size:17px;
+                font-weight:bold;
+                margin-bottom:10px;
+            ">
+                🔊 AI Negotiation — Live Playback
+            </div>
+
+            <div id="status" style="
+                font-size:14px;
+                margin-bottom:12px;
+            ">
+                Preparing Buyer and Seller voices...
+            </div>
+
+            <div style="
+                height:8px;
+                background:#293955;
+                border-radius:10px;
+                overflow:hidden;
+            ">
+                <div id="progress" style="
+                    height:8px;
+                    width:0%;
+                    background:#20c987;
+                    transition:width .3s;
+                "></div>
+            </div>
+
+            <audio id="player" autoplay></audio>
+
+            <script>
+            const tracks = {playlist_json};
+            const playbackId = {playback_id};
+
+            const player = document.getElementById("player");
+            const status = document.getElementById("status");
+            const progress = document.getElementById("progress");
+
+            let current = 0;
+
+            function playNext() {{
+
+                if (current >= tracks.length) {{
+
+                    status.innerText =
+                        "✅ Full negotiation completed!";
+
+                    progress.style.width = "100%";
+
+                    return;
+                }}
+
+                const track = tracks[current];
+
+                status.innerText =
+                    "🔊 Now speaking: " + track.label +
+                    " (" + (current + 1) +
+                    " of " + tracks.length + ")";
+
+                progress.style.width =
+                    ((current / tracks.length) * 100) + "%";
+
+                player.src =
+                    "data:audio/mp3;base64," + track.audio;
+
+                player.load();
+
+                player.play().catch(function(error) {{
+
+                    status.innerText =
+                        "Browser blocked automatic audio playback. " +
+                        "Allow autoplay/audio for this site and reload. " +
+                        "Error: " + error.message;
+
+                }});
+            }}
+
+            player.onended = function() {{
+
+                current++;
+
+                playNext();
+            }};
+
+            player.onerror = function() {{
+
+                status.innerText =
+                    "Audio error. Please reload and try again.";
+
+            }};
+
+            // Attempt automatic playback after the page loads.
+            window.addEventListener("load", function() {{
+
+                setTimeout(playNext, 500);
+
+            }});
+
+            </script>
+
+            </body>
+            </html>
+            """
+
+            components.html(
+                player_html,
+                height=145,
+                scrolling=False
+            )
+
+
+        # ==========================================
+        # 13. FINAL DEAL VALIDATION
         # ==========================================
 
         negotiation_sequence = [
@@ -601,7 +807,7 @@ with conversation_col:
 
 
         # ==========================================
-        # 13. FINAL RESULT DISPLAY
+        # 14. FINAL RESULT DISPLAY
         # ==========================================
 
         if deal:
@@ -643,7 +849,7 @@ with conversation_col:
 
 
         # ==========================================
-        # 14. RAW AI RESPONSE
+        # 15. RAW AI RESPONSE
         # ==========================================
 
         with st.expander("View raw AI response"):
