@@ -29,7 +29,7 @@ st.set_page_config(
 ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
 MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
 
-# Working female Buyer voice and male Seller voice
+# Female Buyer voice and male Seller voice
 BUYER_VOICE_ID = "hpp4J3VqNfWAUOO0d1Us"
 SELLER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 
@@ -218,16 +218,18 @@ def generate_voice(text, voice_id):
     )
 
     if not response.ok:
-    try:
-        error_details = response.json()
-    except Exception:
-        error_details = response.text
 
-    raise ValueError(
-        f"ElevenLabs Error {response.status_code}: {error_details}"
-    )
+        try:
+            error_details = response.json()
 
-return response.content
+        except ValueError:
+            error_details = response.text
+
+        raise ValueError(
+            f"ElevenLabs Error {response.status_code}: {error_details}"
+        )
+
+    return response.content
 
 
 # ==========================================
@@ -422,7 +424,6 @@ if start:
 
                 st.session_state.result = result_data
 
-                # New playback sequence for this negotiation
                 st.session_state.playback_id += 1
 
         except requests.exceptions.Timeout:
@@ -579,7 +580,7 @@ with conversation_col:
                     unsafe_allow_html=True
                 )
 
-                # Generate and collect voice in chronological order
+                # Generate voices in chronological order
                 if voice_enabled and spoken_text.strip():
 
                     try:
@@ -614,8 +615,7 @@ with conversation_col:
                 )
 
 
-
-# ==========================================
+        # ==========================================
         # 12. AUTOMATIC PLAYBACK WITH LIVE SPEAKER GLOW
         # ==========================================
 
@@ -624,8 +624,6 @@ with conversation_col:
             st.markdown("### 🎧 Automatic AI Conversation")
 
             playlist_json = json.dumps(voice_playlist)
-
-            playback_id = st.session_state.playback_id
 
             player_html = f"""
             <!DOCTYPE html>
@@ -844,8 +842,7 @@ with conversation_col:
             )
 
 
-
-                # ==========================================
+        # ==========================================
         # 13. FINAL DEAL VALIDATION
         # ==========================================
 
