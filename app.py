@@ -217,9 +217,17 @@ def generate_voice(text, voice_id):
         timeout=90
     )
 
-    response.raise_for_status()
+    if not response.ok:
+    try:
+        error_details = response.json()
+    except Exception:
+        error_details = response.text
 
-    return response.content
+    raise ValueError(
+        f"ElevenLabs Error {response.status_code}: {error_details}"
+    )
+
+return response.content
 
 
 # ==========================================
