@@ -606,143 +606,235 @@ with conversation_col:
                 )
 
 
-        # ==========================================
-        # 12. AUTOMATIC SEQUENTIAL VOICE PLAYBACK
-        # ==========================================
 
-        if voice_enabled and voice_playlist:
+# ==========================================
+# 12. AUTOMATIC PLAYBACK WITH LIVE SPEAKER GLOW
+# ==========================================
 
-            st.markdown(
-                "### 🎧 Automatic AI Conversation"
-            )
+if voice_enabled and voice_playlist:
 
-            playlist_json = json.dumps(
-                voice_playlist
-            )
+    st.markdown("### 🎧 Automatic AI Conversation")
 
-            playback_id = st.session_state.playback_id
+    playlist_json = json.dumps(voice_playlist)
 
-            player_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <body style="
-                background:#19243c;
-                color:white;
-                font-family:Arial,sans-serif;
-                padding:15px;
-                border-radius:12px;
-            ">
+    playback_id = st.session_state.playback_id
 
-            <div style="
-                font-size:17px;
-                font-weight:bold;
-                margin-bottom:10px;
-            ">
-                🔊 AI Negotiation — Live Playback
-            </div>
+    player_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+    <style>
 
-            <div id="status" style="
-                font-size:14px;
-                margin-bottom:12px;
-            ">
-                Preparing Buyer and Seller voices...
-            </div>
+    body {{
+        background: #19243c;
+        color: white;
+        font-family: Arial, sans-serif;
+        padding: 12px;
+        margin: 0;
+    }}
 
-            <div style="
-                height:8px;
-                background:#293955;
-                border-radius:10px;
-                overflow:hidden;
-            ">
-                <div id="progress" style="
-                    height:8px;
-                    width:0%;
-                    background:#20c987;
-                    transition:width .3s;
-                "></div>
-            </div>
+    .speakers {{
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin: 15px 0;
+    }}
 
-            <audio id="player" autoplay></audio>
+    .speaker {{
+        flex: 1;
+        text-align: center;
+        padding: 18px 8px;
+        border-radius: 16px;
+        background: #182441;
+        border: 2px solid #34415e;
+        opacity: 0.55;
+        transition: all 0.3s ease;
+    }}
 
-            <script>
-            const tracks = {playlist_json};
-            const playbackId = {playback_id};
+    .speaker .avatar {{
+        font-size: 45px;
+    }}
 
-            const player = document.getElementById("player");
-            const status = document.getElementById("status");
-            const progress = document.getElementById("progress");
+    .speaker.active-buyer {{
+        opacity: 1;
+        border-color: #3b82f6;
+        box-shadow:
+            0 0 10px #3b82f6,
+            0 0 25px #3b82f6,
+            inset 0 0 15px rgba(59,130,246,0.25);
+        animation: buyerGlow 1.4s infinite alternate;
+    }}
 
-            let current = 0;
+    .speaker.active-seller {{
+        opacity: 1;
+        border-color: #a855f7;
+        box-shadow:
+            0 0 10px #a855f7,
+            0 0 25px #a855f7,
+            inset 0 0 15px rgba(168,85,247,0.25);
+        animation: sellerGlow 1.4s infinite alternate;
+    }}
 
-            function playNext() {{
+    @keyframes buyerGlow {{
+        from {{ box-shadow: 0 0 8px #3b82f6; }}
+        to {{ box-shadow: 0 0 28px #3b82f6; }}
+    }}
 
-                if (current >= tracks.length) {{
+    @keyframes sellerGlow {{
+        from {{ box-shadow: 0 0 8px #a855f7; }}
+        to {{ box-shadow: 0 0 28px #a855f7; }}
+    }}
 
-                    status.innerText =
-                        "✅ Full negotiation completed!";
+    .status {{
+        text-align: center;
+        font-size: 14px;
+        margin: 12px 0;
+        font-weight: bold;
+    }}
 
-                    progress.style.width = "100%";
+    .progress {{
+        height: 8px;
+        background: #293955;
+        border-radius: 10px;
+        overflow: hidden;
+    }}
 
-                    return;
-                }}
+    .progress-bar {{
+        height: 8px;
+        width: 0%;
+        background: #20c987;
+        transition: width 0.3s;
+    }}
 
-                const track = tracks[current];
+    </style>
+    </head>
 
-                status.innerText =
-                    "🔊 Now speaking: " + track.label +
-                    " (" + (current + 1) +
-                    " of " + tracks.length + ")";
+    <body>
 
-                progress.style.width =
-                    ((current / tracks.length) * 100) + "%";
+    <div style="font-size:17px;font-weight:bold;">
+        🔊 AI Negotiation — Live Conversation
+    </div>
 
-                player.src =
-                    "data:audio/mp3;base64," + track.audio;
+    <div class="speakers">
 
-                player.load();
+        <div id="buyer" class="speaker">
+            <div class="avatar">👩🏻‍💼</div>
+            <b>Buyer AI</b>
+            <div style="font-size:12px;">🔵 Strategic</div>
+        </div>
 
-                player.play().catch(function(error) {{
+        <div id="seller" class="speaker">
+            <div class="avatar">🧑🏻‍💼</div>
+            <b>Seller AI</b>
+            <div style="font-size:12px;">🟣 Persuasive</div>
+        </div>
 
-                    status.innerText =
-                        "Browser blocked automatic audio playback. " +
-                        "Allow autoplay/audio for this site and reload. " +
-                        "Error: " + error.message;
+    </div>
 
-                }});
-            }}
+    <div id="status" class="status">
+        Preparing conversation...
+    </div>
 
-            player.onended = function() {{
+    <div class="progress">
+        <div id="progress" class="progress-bar"></div>
+    </div>
 
-                current++;
+    <audio id="player" autoplay></audio>
 
-                playNext();
-            }};
+    <script>
 
-            player.onerror = function() {{
+    const tracks = {playlist_json};
 
-                status.innerText =
-                    "Audio error. Please reload and try again.";
+    const player = document.getElementById("player");
+    const status = document.getElementById("status");
+    const progress = document.getElementById("progress");
 
-            }};
+    const buyer = document.getElementById("buyer");
+    const seller = document.getElementById("seller");
 
-            // Attempt automatic playback after the page loads.
-            window.addEventListener("load", function() {{
+    let current = 0;
 
-                setTimeout(playNext, 500);
+    function playNext() {{
 
-            }});
+        if (current >= tracks.length) {{
 
-            </script>
+            status.innerText =
+                "✅ Negotiation conversation completed!";
 
-            </body>
-            </html>
-            """
+            progress.style.width = "100%";
 
-            components.html(
-                player_html,
-                height=145,
-                scrolling=False
-            )
+            buyer.className = "speaker";
+            seller.className = "speaker";
+
+            return;
+        }}
+
+        const track = tracks[current];
+
+        const isBuyer =
+            track.label.toLowerCase().includes("buyer");
+
+        buyer.className = isBuyer
+            ? "speaker active-buyer"
+            : "speaker";
+
+        seller.className = isBuyer
+            ? "speaker"
+            : "speaker active-seller";
+
+        status.innerText =
+            "🔊 Now speaking: " + track.label +
+            " (" + (current + 1) +
+            " of " + tracks.length + ")";
+
+        progress.style.width =
+            ((current / tracks.length) * 100) + "%";
+
+        player.src =
+            "data:audio/mp3;base64," + track.audio;
+
+        player.load();
+
+        player.play().catch(function(error) {{
+
+            status.innerText =
+                "Browser blocked playback: " + error.message;
+
+        }});
+    }}
+
+    player.onended = function() {{
+
+        current++;
+
+        playNext();
+
+    }};
+
+    player.onerror = function() {{
+
+        status.innerText = "Audio playback error.";
+
+    }};
+
+    window.addEventListener("load", function() {{
+
+        setTimeout(playNext, 500);
+
+    }});
+
+    </script>
+
+    </body>
+    </html>
+    """
+
+    components.html(
+        player_html,
+        height=300,
+        scrolling=False
+    )
+
 
 
         # ==========================================
