@@ -1,6 +1,7 @@
 
 import json
 import html
+import math
 import requests
 import streamlit as st
 
@@ -54,6 +55,7 @@ st.markdown("""
     border-radius: 16px;
     padding: 22px;
     text-align: center;
+    color: white;
 }
 
 .no-deal {
@@ -126,25 +128,21 @@ def rupees(value):
         return "—"
 
 
-def valid_number(value):
-
-    if isinstance(value, bool):
-        return False
-
-    try:
-        float(value)
-        return True
-
-    except (TypeError, ValueError):
-        return False
-
-
 def normalize_price(value):
 
-    if not valid_number(value):
+    if isinstance(value, bool):
         return None
 
-    return float(value)
+    try:
+        number = float(value)
+
+        if not math.isfinite(number):
+            return None
+
+        return number
+
+    except (TypeError, ValueError):
+        return None
 
 
 # ==========================================
@@ -281,7 +279,7 @@ if start:
                 f"Webhook connection failed: {error}"
             )
 
-        except (ValueError, json.JSONDecodeError) as error:
+        except ValueError as error:
 
             st.error(
                 f"Invalid webhook response: {error}"
@@ -299,24 +297,32 @@ buyer_col, conversation_col, seller_col = st.columns(
 
 with buyer_col:
 
-    st.markdown(
+    buyer_card = (
         '<div class="agent">'
         '<div style="font-size:65px">👩🏻‍💼</div>'
         '<h3>Buyer AI</h3>'
         '<p>🔵 Strategic · Firm</p>'
-        '</div>',
+        '</div>'
+    )
+
+    st.markdown(
+        buyer_card,
         unsafe_allow_html=True
     )
 
 
 with seller_col:
 
-    st.markdown(
+    seller_card = (
         '<div class="agent seller">'
         '<div style="font-size:65px">🧑🏻‍💼</div>'
         '<h3>Seller AI</h3>'
         '<p>🟣 Confident · Persuasive</p>'
-        '</div>',
+        '</div>'
+    )
+
+    st.markdown(
+        seller_card,
         unsafe_allow_html=True
     )
 
@@ -339,20 +345,15 @@ with conversation_col:
 
     else:
 
-        display_product = data.get("product", product)
-
-        st.write(f"**Product:** {display_product}")
+        st.write(
+            f"**Product:** {data.get('product', product)}"
+        )
 
         labels = [
-
             ("Round 1 · Buyer AI", "buyer_round_1", "🔵"),
-
             ("Round 1 · Seller AI", "seller_round_1", "🟣"),
-
             ("Round 2 · Buyer AI", "buyer_round_2", "🔵"),
-
             ("Round 2 · Seller AI", "seller_round_2", "🟣")
-
         ]
 
         parsed = {}
@@ -384,16 +385,18 @@ with conversation_col:
                     agent.get("proposed_price")
                 )
 
+                chat_html = (
+                    '<div class="chat">'
+                    f'<b>{emoji} {label}</b>'
+                    '<br>'
+                    f'{spoken}'
+                    '<br>'
+                    f'<b>{price}</b> · {decision}'
+                    '</div>'
+                )
+
                 st.markdown(
-                    f"""
-                    <div class="chat">
-                        <b>{emoji} {label}</b>
-                        <br>
-                        {spoken}
-                        <br>
-                        <b>{price}</b> · {decision}
-                    </div>
-                    """,
+                    chat_html,
                     unsafe_allow_html=True
                 )
 
@@ -408,7 +411,8 @@ with conversation_col:
         # 10. FINAL DEAL VALIDATION
         # ==========================================
 
-        # Responses must be checked in chronological order.
+        # Maintain the actual chronological order
+        # of the negotiation.
 
         negotiation_sequence = [
 
@@ -426,8 +430,8 @@ with conversation_col:
 
         agreed_price = None
 
-        # A deal occurs when an agent explicitly accepts
-        # the immediately preceding agent's offer.
+        # Compare each response with the immediately
+        # preceding offer.
         #
         # Buyer R1 -> Seller R1
         # Seller R1 -> Buyer R2
@@ -456,16 +460,17 @@ with conversation_col:
             if current_price is None:
                 continue
 
+            # The current agent must explicitly accept.
+
             if current_decision != "accept":
                 continue
 
-            # The accepted price must match
-            # the immediately preceding offer.
+            # Accepted price must match the previous offer.
 
             if previous_price != current_price:
                 continue
 
-            # Check both parties' price limits.
+            # Both parties' limits must be respected.
 
             if not (
                 seller_min <= current_price <= buyer_max
@@ -480,25 +485,23 @@ with conversation_col:
 
 
         # ==========================================
-        # 11. DISPLAY FINAL RESULT
+        # 11. FINAL RESULT DISPLAY
         # ==========================================
 
         if deal:
 
             savings = seller_open - agreed_price
 
+            result_html = (
+                '<div class="result">'
+                '<h2>🤝 DEAL REACHED!</h2>'
+                f'<h1>{rupees(agreed_price)}</h1>'
+                '<p>Both AI agents agreed on a valid price.</p>'
+                '</div>'
+            )
+
             st.markdown(
-                f"""
-                <div class="result">
-
-                    <h2>🤝 DEAL REACHED!</h2>
-
-                    <h1>{rupees(agreed_price)}</h1>
-
-                    Both AI agents agreed on a valid price.
-
-                </div>
-                """,
+                result_html,
                 unsafe_allow_html=True
             )
 
@@ -509,17 +512,16 @@ with conversation_col:
 
         else:
 
+            result_html = (
+                '<div class="no-deal">'
+                '<h3>NO DEAL</h3>'
+                '<p>The agents did not reach a mutually '
+                'accepted price within both limits.</p>'
+                '</div>'
+            )
+
             st.markdown(
-                """
-                <div class="no-deal">
-
-                    <h4>NO DEAL</h4>
-
-                    The agents did not reach a mutually
-                    accepted price within both limits.
-
-                </div>
-                """,
+                result_html,
                 unsafe_allow_html=True
             )
 
