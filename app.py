@@ -26,8 +26,8 @@ st.set_page_config(
 # 2. API CONFIGURATION
 # ==========================================
 
-ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
-MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
+ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "sk_dd6ff6b5ab04e4ede3ea860612b2e125807a0feb1e59b7fe")
+MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "uxw-3YMyT_gi5Ni")
 
 # Working female Buyer voice and male Seller voice
 BUYER_VOICE_ID = "hpp4J3VqNfWAUOO0d1Us"
@@ -608,236 +608,236 @@ with conversation_col:
 
 
 # ==========================================
-# 12. AUTOMATIC PLAYBACK WITH LIVE SPEAKER GLOW
-# ==========================================
-
-if voice_enabled and voice_playlist:
-
-    st.markdown("### 🎧 Automatic AI Conversation")
-
-    playlist_json = json.dumps(voice_playlist)
-
-    playback_id = st.session_state.playback_id
-
-    player_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-    <style>
-
-    body {{
-        background: #19243c;
-        color: white;
-        font-family: Arial, sans-serif;
-        padding: 12px;
-        margin: 0;
-    }}
-
-    .speakers {{
-        display: flex;
-        gap: 15px;
-        justify-content: center;
-        margin: 15px 0;
-    }}
-
-    .speaker {{
-        flex: 1;
-        text-align: center;
-        padding: 18px 8px;
-        border-radius: 16px;
-        background: #182441;
-        border: 2px solid #34415e;
-        opacity: 0.55;
-        transition: all 0.3s ease;
-    }}
-
-    .speaker .avatar {{
-        font-size: 45px;
-    }}
-
-    .speaker.active-buyer {{
-        opacity: 1;
-        border-color: #3b82f6;
-        box-shadow:
-            0 0 10px #3b82f6,
-            0 0 25px #3b82f6,
-            inset 0 0 15px rgba(59,130,246,0.25);
-        animation: buyerGlow 1.4s infinite alternate;
-    }}
-
-    .speaker.active-seller {{
-        opacity: 1;
-        border-color: #a855f7;
-        box-shadow:
-            0 0 10px #a855f7,
-            0 0 25px #a855f7,
-            inset 0 0 15px rgba(168,85,247,0.25);
-        animation: sellerGlow 1.4s infinite alternate;
-    }}
-
-    @keyframes buyerGlow {{
-        from {{ box-shadow: 0 0 8px #3b82f6; }}
-        to {{ box-shadow: 0 0 28px #3b82f6; }}
-    }}
-
-    @keyframes sellerGlow {{
-        from {{ box-shadow: 0 0 8px #a855f7; }}
-        to {{ box-shadow: 0 0 28px #a855f7; }}
-    }}
-
-    .status {{
-        text-align: center;
-        font-size: 14px;
-        margin: 12px 0;
-        font-weight: bold;
-    }}
-
-    .progress {{
-        height: 8px;
-        background: #293955;
-        border-radius: 10px;
-        overflow: hidden;
-    }}
-
-    .progress-bar {{
-        height: 8px;
-        width: 0%;
-        background: #20c987;
-        transition: width 0.3s;
-    }}
-
-    </style>
-    </head>
-
-    <body>
-
-    <div style="font-size:17px;font-weight:bold;">
-        🔊 AI Negotiation — Live Conversation
-    </div>
-
-    <div class="speakers">
-
-        <div id="buyer" class="speaker">
-            <div class="avatar">👩🏻‍💼</div>
-            <b>Buyer AI</b>
-            <div style="font-size:12px;">🔵 Strategic</div>
-        </div>
-
-        <div id="seller" class="speaker">
-            <div class="avatar">🧑🏻‍💼</div>
-            <b>Seller AI</b>
-            <div style="font-size:12px;">🟣 Persuasive</div>
-        </div>
-
-    </div>
-
-    <div id="status" class="status">
-        Preparing conversation...
-    </div>
-
-    <div class="progress">
-        <div id="progress" class="progress-bar"></div>
-    </div>
-
-    <audio id="player" autoplay></audio>
-
-    <script>
-
-    const tracks = {playlist_json};
-
-    const player = document.getElementById("player");
-    const status = document.getElementById("status");
-    const progress = document.getElementById("progress");
-
-    const buyer = document.getElementById("buyer");
-    const seller = document.getElementById("seller");
-
-    let current = 0;
-
-    function playNext() {{
-
-        if (current >= tracks.length) {{
-
-            status.innerText =
-                "✅ Negotiation conversation completed!";
-
-            progress.style.width = "100%";
-
-            buyer.className = "speaker";
-            seller.className = "speaker";
-
-            return;
-        }}
-
-        const track = tracks[current];
-
-        const isBuyer =
-            track.label.toLowerCase().includes("buyer");
-
-        buyer.className = isBuyer
-            ? "speaker active-buyer"
-            : "speaker";
-
-        seller.className = isBuyer
-            ? "speaker"
-            : "speaker active-seller";
-
-        status.innerText =
-            "🔊 Now speaking: " + track.label +
-            " (" + (current + 1) +
-            " of " + tracks.length + ")";
-
-        progress.style.width =
-            ((current / tracks.length) * 100) + "%";
-
-        player.src =
-            "data:audio/mp3;base64," + track.audio;
-
-        player.load();
-
-        player.play().catch(function(error) {{
-
-            status.innerText =
-                "Browser blocked playback: " + error.message;
-
-        }});
-    }}
-
-    player.onended = function() {{
-
-        current++;
-
-        playNext();
-
-    }};
-
-    player.onerror = function() {{
-
-        status.innerText = "Audio playback error.";
-
-    }};
-
-    window.addEventListener("load", function() {{
-
-        setTimeout(playNext, 500);
-
-    }});
-
-    </script>
-
-    </body>
-    </html>
-    """
-
-    components.html(
-        player_html,
-        height=300,
-        scrolling=False
-    )
-
-
-
+        # 12. AUTOMATIC PLAYBACK WITH LIVE SPEAKER GLOW
         # ==========================================
+
+        if voice_enabled and voice_playlist:
+
+            st.markdown("### 🎧 Automatic AI Conversation")
+
+            playlist_json = json.dumps(voice_playlist)
+
+            playback_id = st.session_state.playback_id
+
+            player_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+
+            body {{
+                background: #19243c;
+                color: white;
+                font-family: Arial, sans-serif;
+                padding: 12px;
+                margin: 0;
+            }}
+
+            .speakers {{
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                margin: 15px 0;
+            }}
+
+            .speaker {{
+                flex: 1;
+                text-align: center;
+                padding: 18px 8px;
+                border-radius: 16px;
+                background: #182441;
+                border: 2px solid #34415e;
+                opacity: 0.55;
+                transition: all 0.3s ease;
+            }}
+
+            .speaker .avatar {{
+                font-size: 45px;
+            }}
+
+            .speaker.active-buyer {{
+                opacity: 1;
+                border-color: #3b82f6;
+                box-shadow:
+                    0 0 10px #3b82f6,
+                    0 0 25px #3b82f6,
+                    inset 0 0 15px rgba(59,130,246,0.25);
+                animation: buyerGlow 1.4s infinite alternate;
+            }}
+
+            .speaker.active-seller {{
+                opacity: 1;
+                border-color: #a855f7;
+                box-shadow:
+                    0 0 10px #a855f7,
+                    0 0 25px #a855f7,
+                    inset 0 0 15px rgba(168,85,247,0.25);
+                animation: sellerGlow 1.4s infinite alternate;
+            }}
+
+            @keyframes buyerGlow {{
+                from {{ box-shadow: 0 0 8px #3b82f6; }}
+                to {{ box-shadow: 0 0 28px #3b82f6; }}
+            }}
+
+            @keyframes sellerGlow {{
+                from {{ box-shadow: 0 0 8px #a855f7; }}
+                to {{ box-shadow: 0 0 28px #a855f7; }}
+            }}
+
+            .status {{
+                text-align: center;
+                font-size: 14px;
+                margin: 12px 0;
+                font-weight: bold;
+            }}
+
+            .progress {{
+                height: 8px;
+                background: #293955;
+                border-radius: 10px;
+                overflow: hidden;
+            }}
+
+            .progress-bar {{
+                height: 8px;
+                width: 0%;
+                background: #20c987;
+                transition: width 0.3s;
+            }}
+
+            </style>
+            </head>
+
+            <body>
+
+            <div style="font-size:17px;font-weight:bold;">
+                🔊 AI Negotiation — Live Conversation
+            </div>
+
+            <div class="speakers">
+
+                <div id="buyer" class="speaker">
+                    <div class="avatar">👩🏻‍💼</div>
+                    <b>Buyer AI</b>
+                    <div style="font-size:12px;">🔵 Strategic</div>
+                </div>
+
+                <div id="seller" class="speaker">
+                    <div class="avatar">🧑🏻‍💼</div>
+                    <b>Seller AI</b>
+                    <div style="font-size:12px;">🟣 Persuasive</div>
+                </div>
+
+            </div>
+
+            <div id="status" class="status">
+                Preparing conversation...
+            </div>
+
+            <div class="progress">
+                <div id="progress" class="progress-bar"></div>
+            </div>
+
+            <audio id="player" autoplay></audio>
+
+            <script>
+
+            const tracks = {playlist_json};
+
+            const player = document.getElementById("player");
+            const status = document.getElementById("status");
+            const progress = document.getElementById("progress");
+
+            const buyer = document.getElementById("buyer");
+            const seller = document.getElementById("seller");
+
+            let current = 0;
+
+            function playNext() {{
+
+                if (current >= tracks.length) {{
+
+                    status.innerText =
+                        "✅ Negotiation conversation completed!";
+
+                    progress.style.width = "100%";
+
+                    buyer.className = "speaker";
+                    seller.className = "speaker";
+
+                    return;
+                }}
+
+                const track = tracks[current];
+
+                const isBuyer =
+                    track.label.toLowerCase().includes("buyer");
+
+                buyer.className = isBuyer
+                    ? "speaker active-buyer"
+                    : "speaker";
+
+                seller.className = isBuyer
+                    ? "speaker"
+                    : "speaker active-seller";
+
+                status.innerText =
+                    "🔊 Now speaking: " + track.label +
+                    " (" + (current + 1) +
+                    " of " + tracks.length + ")";
+
+                progress.style.width =
+                    ((current / tracks.length) * 100) + "%";
+
+                player.src =
+                    "data:audio/mp3;base64," + track.audio;
+
+                player.load();
+
+                player.play().catch(function(error) {{
+
+                    status.innerText =
+                        "Browser blocked playback: " + error.message;
+
+                }});
+            }}
+
+            player.onended = function() {{
+
+                current++;
+
+                playNext();
+
+            }};
+
+            player.onerror = function() {{
+
+                status.innerText = "Audio playback error.";
+
+            }};
+
+            window.addEventListener("load", function() {{
+
+                setTimeout(playNext, 500);
+
+            }});
+
+            </script>
+
+            </body>
+            </html>
+            """
+
+            components.html(
+                player_html,
+                height=300,
+                scrolling=False
+            )
+
+
+
+                # ==========================================
         # 13. FINAL DEAL VALIDATION
         # ==========================================
 
