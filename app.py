@@ -28,7 +28,7 @@ ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "")
 MAKE_API_KEY = st.secrets.get("MAKE_API_KEY", "")
 
 # Different voices for Buyer and Seller
-BUYER_VOICE_ID = "21m00Tcm4TlvDq8ikWAM"
+BUYER_VOICE_ID = "RABOvaPec1ymXz02oDQi"
 SELLER_VOICE_ID = "JBFqnCBsd6RMkjVDRZzb"
 
 
